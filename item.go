@@ -8,11 +8,12 @@ import (
 )
 
 type Item struct {
-	ID         string `json:"id"`
-	Meta       int    `json:"meta"`
-	Slot       int    `json:"slot"`
-	CustomName string `json:"custom_name"`
-	Action     string `json:"action"`
+	ID          string `json:"id"`
+	Meta        int    `json:"meta"`
+	Slot        int    `json:"slot"`
+	CustomName  string `json:"custom_name"`
+	UseAction   string `json:"use_action"`
+	ClickAction string `json:"click_action"`
 }
 
 func (i Item) Stack() (item.Stack, int) {
@@ -28,8 +29,11 @@ func (i Item) Stack() (item.Stack, int) {
 	}
 
 	stack := item.NewStack(it, 1).WithCustomName(i.CustomName)
-	if i.Action != "" {
-		stack = stack.WithValue(actionKey, i.Action)
+	if i.UseAction != "" {
+		stack = stack.WithValue(useActionKey, i.UseAction)
+	}
+	if i.ClickAction != "" {
+		stack = stack.WithValue(clickActionKey, i.ClickAction)
 	}
 	return stack, i.Slot
 }
@@ -39,8 +43,13 @@ func (i Item) WithCustomName(name string) Item {
 	return i
 }
 
-func (i Item) WithAction(action string) Item {
-	i.Action = action
+func (i Item) WithUseAction(action string) Item {
+	i.UseAction = action
+	return i
+}
+
+func (i Item) WithClickAction(action string) Item {
+	i.ClickAction = action
 	return i
 }
 
@@ -54,15 +63,20 @@ func ItemFromStack(st item.Stack) Item {
 		return Item{}
 	}
 	id, meta := st.Item().EncodeItem()
-	var action string
-	if actionVal, ok := st.Value(actionKey); ok {
-		action = actionVal.(string)
+	var useAction string
+	if actionVal, ok := st.Value(useActionKey); ok {
+		useAction = actionVal.(string)
+	}
+	var clickAction string
+	if actionVal, ok := st.Value(clickActionKey); ok {
+		clickAction = actionVal.(string)
 	}
 
 	return Item{
-		ID:         id,
-		Meta:       int(meta),
-		CustomName: st.CustomName(),
-		Action:     action,
+		ID:          id,
+		Meta:        int(meta),
+		CustomName:  st.CustomName(),
+		UseAction:   useAction,
+		ClickAction: clickAction,
 	}
 }
