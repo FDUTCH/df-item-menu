@@ -3,6 +3,7 @@ package df_item_menu
 import (
 	"reflect"
 
+	"github.com/FDUTCH/patterns"
 	"github.com/df-mc/dragonfly/server/player"
 )
 
@@ -11,13 +12,13 @@ const (
 	clickActionKey = "click_action_key"
 )
 
-type Menu struct {
+type Menu[T player.Handler] struct {
 	useCallbacks   map[int]func(*player.Player)
 	clickCallbacks map[int]func(*player.Player)
 	items          []Item
 }
 
-func (m *Menu) Set(pl *player.Player) {
+func (m *Menu[T]) Set(pl *player.Player) {
 	inv := pl.Inventory()
 	inv.Clear()
 	for _, it := range m.items {
@@ -26,19 +27,19 @@ func (m *Menu) Set(pl *player.Player) {
 	}
 }
 
-func NewMenu(items ...Item) *Menu {
-	return &Menu{useCallbacks: make(map[int]func(*player.Player)), clickCallbacks: make(map[int]func(*player.Player)), items: items}
+func NewMenu[T player.Handler](items ...Item) *Menu[T] {
+	return &Menu[T]{useCallbacks: make(map[int]func(*player.Player)), clickCallbacks: make(map[int]func(*player.Player)), items: items}
 }
 
-func (m *Menu) HandleItemUse(ctx *player.Context) {
+func (m *Menu[T]) HandleItemUse(ctx *player.Context) {
 	m.trigger(ctx, false)
 }
 
-func (m *Menu) HandleClick(ctx *player.Context) {
+func (m *Menu[T]) HandleClick(ctx *player.Context) {
 	m.trigger(ctx, true)
 }
 
-func (m *Menu) trigger(ctx *player.Context, click bool) {
+func (m *Menu[T]) trigger(ctx *player.Context, click bool) {
 	pl := ctx.Val()
 	main, _ := pl.HeldItems()
 	if main.Empty() {
@@ -66,38 +67,41 @@ func (m *Menu) trigger(ctx *player.Context, click bool) {
 	val, ok := main.Value(action)
 	if ok {
 		ctx.Cancel()
-		reflect.ValueOf(pl.Handler()).
-			MethodByName(val.(string)).
-			Call([]reflect.Value{reflect.ValueOf(pl)})
+		handler, ok := patterns.UnwrapUntilCast[player.Handler, T](pl.Handler())
+		if ok {
+			reflect.ValueOf(handler).
+				MethodByName(val.(string)).
+				Call([]reflect.Value{reflect.ValueOf(pl)})
+		}
 	}
 }
 
-func (m *Menu) WithItem(item Item) *MenuWithSlot {
+func (m *Menu[T]) WithItem(item Item) *MenuWithSlot[T] {
 	m.items = append(m.items, item)
-	return &MenuWithSlot{
+	return &MenuWithSlot[T]{
 		Menu:     m,
 		lastSlot: item.Slot,
 	}
 }
 
-func (m *Menu) Slot(slot int) *MenuWithSlot {
-	return &MenuWithSlot{
+func (m *Menu[T]) Slot(slot int) *MenuWithSlot[T] {
+	return &MenuWithSlot[T]{
 		Menu:     m,
 		lastSlot: slot,
 	}
 }
 
-type MenuWithSlot struct {
-	*Menu
+type MenuWithSlot[T player.Handler] struct {
+	*Menu[T]
 	lastSlot int
 }
 
-func (m *MenuWithSlot) WithUseCallback(callback func(*player.Player)) *Menu {
+func (m *MenuWithSlot[T]) WithUseCallback(callback func(*player.Player)) *Menu[T] {
 	m.useCallbacks[m.lastSlot] = callback
 	return m.Menu
 }
 
-func (m *MenuWithSlot) WithClickCallback(callback func(*player.Player)) *Menu {
+func (m *MenuWithSlot[T]) WithClickCallback(callback func(*player.Player)) *Menu[T] {
 	m.clickCallbacks[m.lastSlot] = callback
 	return m.Menu
 }
